@@ -15,20 +15,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'minerva-app-jwt-secret';
 app.use(cors());
 app.use(express.json());
 
-// Check if environment variables are set
-if (!process.env.MG_USER || !process.env.MG_PASS) {
-  console.error('Error: McGill credentials not set in .env file');
-  process.exit(1);
-}
-
-// Initialize Minerva client with error handling
-let minerva;
-try {
-  minerva = new Minerva(process.env.MG_USER, process.env.MG_PASS);
-} catch (error) {
-  console.error('Error initializing Minerva client:', error);
-  process.exit(1);
-}
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
