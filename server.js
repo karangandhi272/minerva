@@ -115,11 +115,64 @@ app.get('/api/user', authenticateToken, (req, res) => {
   });
 });
 
-// Get transcript
+// Get transcript (POST version that accepts credentials in body)
+app.post('/api/transcript', authenticateToken, async (req, res) => {
+  try {
+    // Get credentials from body or token
+    const username = req.body.username || req.user.username;
+    const password = req.body.password || req.user.password;
+    
+    // Create a new Minerva instance with the provided credentials
+    const userMinerva = new Minerva(username, password);
+    
+    const transcript = await userMinerva.getTranscript();
+    
+    // Validate transcript data
+    if (!transcript || !Array.isArray(transcript)) {
+      return res.status(500).json({ error: 'Invalid transcript data received' });
+    }
+    
+    // Calculate CUM GPA
+    let totalGradePoints = 0;
+    let totalCredits = 0;
+    
+    transcript.forEach(course => {
+      if (course.grade && course.credit) {
+        const gradePoint = convertGradeToPoints(course.grade);
+        const credits = parseFloat(course.credit);
+        
+        if (!isNaN(gradePoint) && !isNaN(credits)) {
+          totalGradePoints += gradePoint * credits;
+          totalCredits += credits;
+        }
+      }
+    });
+    
+    const cumGPA = totalCredits > 0 ? (totalGradePoints / totalCredits).toFixed(2) : 'N/A';
+    
+    res.json({
+      cumGPA,
+      courses: transcript
+    });
+  } catch (error) {
+    console.error('Error fetching transcript:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch transcript', 
+      message: error.message || 'Unknown error',
+      code: error.code || 'UNKNOWN_ERROR'
+    });
+  }
+});
+
+// Keep the original GET endpoint for backward compatibility
 app.get('/api/transcript', authenticateToken, async (req, res) => {
   try {
-    // Create a new Minerva instance with the user's credentials from the token
-    const userMinerva = new Minerva(req.user.username, req.user.password);
+    // Get credentials from query params or token
+    const username = req.query.username || req.user.username;
+    const password = req.query.password || req.user.password;
+    
+    // Create a new Minerva instance with the provided credentials
+    const userMinerva = new Minerva(username, password);
     
     const transcript = await userMinerva.getTranscript();
     
@@ -164,6 +217,8 @@ app.get('/api/transcript', authenticateToken, async (req, res) => {
 app.get('/api/courses', authenticateToken, async (req, res) => {
   try {
     const { dep, number, season, year } = req.query;
+    const username = req.body.username || req.user.username;
+    const password = req.body.password || req.user.password;
     
     // Input validation
     if (!dep) {
@@ -182,8 +237,8 @@ app.get('/api/courses', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Course number format is invalid' });
     }
     
-    // Create a new Minerva instance with the user's credentials from the token
-    const userMinerva = new Minerva(req.user.username, req.user.password);
+    // Create a new Minerva instance with the user's credentials
+    const userMinerva = new Minerva(username, password);
     
     const options = {
       dep: dep.toUpperCase(),
@@ -239,7 +294,7 @@ app.post('/api/courses/add', authenticateToken, async (req, res) => {
       }
     }
     
-    // Create a new Minerva instance with the user's credentials from the token
+    // Create a new Minerva instance with the user's credentials
     const userMinerva = new Minerva(req.user.username, req.user.password);
     
     const result = await userMinerva.addCourses({
@@ -289,7 +344,7 @@ app.post('/api/courses/drop', authenticateToken, async (req, res) => {
       }
     }
     
-    // Create a new Minerva instance with the user's credentials from the token
+    // Create a new Minerva instance with the user's credentials
     const userMinerva = new Minerva(req.user.username, req.user.password);
     
     const result = await userMinerva.dropCourses({
