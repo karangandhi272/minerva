@@ -15,6 +15,20 @@ const JWT_SECRET = process.env.JWT_SECRET || 'minerva-app-jwt-secret';
 app.use(cors());
 app.use(express.json());
 
+// Check if environment variables are set
+if (!process.env.MG_USER || !process.env.MG_PASS) {
+  console.error('Error: McGill credentials not set in .env file');
+  process.exit(1);
+}
+
+// Initialize Minerva client with error handling
+let minerva;
+try {
+  minerva = new Minerva(process.env.MG_USER, process.env.MG_PASS);
+} catch (error) {
+  console.error('Error initializing Minerva client:', error);
+  process.exit(1);
+}
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -73,8 +87,8 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     // If we get here, authentication was successful
-    // Create a JWT token (usually includes user info, but we'll keep it minimal)
-    const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '7d' }); 
+    // Create a JWT token with username and password
+    const token = jwt.sign({ username, password }, JWT_SECRET, { expiresIn: '7d' }); 
     
     // Return the token to the client
     res.json({ 
@@ -104,12 +118,10 @@ app.get('/api/user', authenticateToken, (req, res) => {
 // Get transcript
 app.get('/api/transcript', authenticateToken, async (req, res) => {
   try {
-    // Validate Minerva client
-    if (!minerva) {
-      return res.status(500).json({ error: 'Minerva client not initialized' });
-    }
-
-    const transcript = await minerva.getTranscript();
+    // Create a new Minerva instance with the user's credentials from the token
+    const userMinerva = new Minerva(req.user.username, req.user.password);
+    
+    const transcript = await userMinerva.getTranscript();
     
     // Validate transcript data
     if (!transcript || !Array.isArray(transcript)) {
@@ -170,10 +182,8 @@ app.get('/api/courses', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Course number format is invalid' });
     }
     
-    // Validate Minerva client
-    if (!minerva) {
-      return res.status(500).json({ error: 'Minerva client not initialized' });
-    }
+    // Create a new Minerva instance with the user's credentials from the token
+    const userMinerva = new Minerva(req.user.username, req.user.password);
     
     const options = {
       dep: dep.toUpperCase(),
@@ -185,7 +195,7 @@ app.get('/api/courses', authenticateToken, async (req, res) => {
       options.number = number;
     }
     
-    const courses = await minerva.getCourses(options);
+    const courses = await userMinerva.getCourses(options);
     
     // Validate courses data
     if (!courses || !Array.isArray(courses)) {
@@ -229,12 +239,10 @@ app.post('/api/courses/add', authenticateToken, async (req, res) => {
       }
     }
     
-    // Validate Minerva client
-    if (!minerva) {
-      return res.status(500).json({ error: 'Minerva client not initialized' });
-    }
+    // Create a new Minerva instance with the user's credentials from the token
+    const userMinerva = new Minerva(req.user.username, req.user.password);
     
-    const result = await minerva.addCourses({
+    const result = await userMinerva.addCourses({
       season: season.toLowerCase(),
       year,
       crn
@@ -281,12 +289,10 @@ app.post('/api/courses/drop', authenticateToken, async (req, res) => {
       }
     }
     
-    // Validate Minerva client
-    if (!minerva) {
-      return res.status(500).json({ error: 'Minerva client not initialized' });
-    }
+    // Create a new Minerva instance with the user's credentials from the token
+    const userMinerva = new Minerva(req.user.username, req.user.password);
     
-    const result = await minerva.dropCourses({
+    const result = await userMinerva.dropCourses({
       season: season.toLowerCase(),
       year,
       crn
