@@ -374,6 +374,58 @@ app.post('/api/courses/drop', authenticateToken, async (req, res) => {
   }
 });
 
+// Get registered courses
+app.post('/api/courses/registered', authenticateToken, async (req, res) => {
+  try {
+    // Get parameters from request body
+    const { season, year, username, password } = req.body;
+    
+    // Use credentials from request body or fallback to token
+    const userCredentials = {
+      username: username || req.user.username,
+      password: password || req.user.password
+    };
+    
+    // Input validation
+    if (!season || !['f', 'w', 's'].includes(season.toLowerCase())) {
+      return res.status(400).json({ error: 'Valid season is required (f, w, s)' });
+    }
+
+    if (!year || !/^\d{4}$/.test(year)) {
+      return res.status(400).json({ error: 'Valid 4-digit year is required' });
+    }
+    
+    console.log(`Fetching registered courses for ${season} ${year}`);
+    
+    // Create a new Minerva instance with the user's credentials
+    const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
+    
+    // Call the getRegisteredCourses method from minerva.js
+    const registeredCourses = await userMinerva.getRegisteredCourses({
+      season: season.toLowerCase(),
+      year
+    });
+    
+    // Validate the response
+    if (!registeredCourses || !Array.isArray(registeredCourses)) {
+      console.error('Invalid registered courses data received:', registeredCourses);
+      return res.status(500).json({ error: 'Invalid registered courses data received' });
+    }
+    
+    console.log(`Found ${registeredCourses.length} registered courses`);
+    
+    // Return the registered courses to the client
+    res.json(registeredCourses);
+  } catch (error) {
+    console.error('Error fetching registered courses:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch registered courses', 
+      message: error.message || 'Unknown error',
+      code: error.code || 'UNKNOWN_ERROR'
+    });
+  }
+});
+
 // Helper function to convert letter grades to grade points
 function convertGradeToPoints(grade) {
   if (!grade || typeof grade !== 'string') {
