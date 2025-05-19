@@ -217,7 +217,10 @@ app.get('/api/transcript', authenticateToken, async (req, res) => {
 // Search for courses
 app.get('/api/courses', authenticateToken, async (req, res) => {
   try {
-    const { dep, number, season, year } = req.query;
+    const dep= req.body.dep;
+    const number =  req.body.number
+    const season = req.body.season
+    const year = req.body.year;
     const username = req.body.username || req.user.username;
     const password = req.body.password || req.user.password;
     
