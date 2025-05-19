@@ -217,13 +217,13 @@ app.get('/api/transcript', authenticateToken, async (req, res) => {
 // Search for courses
 app.get('/api/courses', authenticateToken, async (req, res) => {
   try {
-    const dep= req.body.dep;
-    const number =  req.body.number
-    const season = req.body.season
-    const year = req.body.year;
-    const username = req.body.username || req.user.username;
-    const password = req.body.password || req.user.password;
-    
+  const dep = req.query.dep;
+    const number = req.query.number;
+    const season = req.query.season;
+    const year = req.query.year;
+    const username = req.query.username || req.user.username;
+    const password = req.query.password || req.user.password;
+
     // Input validation
     if (!dep) {
       return res.status(400).json({ error: 'Department is required' });
