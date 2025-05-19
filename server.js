@@ -253,7 +253,7 @@ app.get('/api/courses', authenticateToken, async (req, res) => {
     
     const courses = await userMinerva.getCourses(options);
 
-    console.log('Courses fetched:', courses);
+    return courses;
     
     // Validate courses data
     if (!courses || !Array.isArray(courses)) {
