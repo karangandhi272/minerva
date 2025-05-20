@@ -30,6 +30,240 @@ try {
   process.exit(1);
 }
 
+// Dummy data for demo account
+const dummyData = {
+  transcript: {
+    cumGPA: '3.75',
+    courses: [
+      {
+        completed: '',
+        department: 'COMP',
+        course_number: '202',
+        section: '001',
+        credit: '3',
+        grade: 'A',
+        class_avg: 'B+',
+        term: 'Fall',
+        year: '2023',
+        title: 'Foundations of Programming'
+      },
+      {
+        completed: '',
+        department: 'COMP',
+        course_number: '250',
+        section: '002',
+        credit: '3',
+        grade: 'A-',
+        class_avg: 'B',
+        term: 'Fall',
+        year: '2023',
+        title: 'Intro to Computer Science'
+      },
+      {
+        completed: '',
+        department: 'MATH',
+        course_number: '240',
+        section: '001',
+        credit: '3',
+        grade: 'B+',
+        class_avg: 'B-',
+        term: 'Fall',
+        year: '2023',
+        title: 'Discrete Structures'
+      },
+      {
+        completed: '',
+        department: 'COMP',
+        course_number: '206',
+        section: '001',
+        credit: '3',
+        grade: 'A-',
+        class_avg: 'B',
+        term: 'Winter',
+        year: '2024',
+        title: 'Introduction to Software Systems'
+      },
+      {
+        completed: '',
+        department: 'COMP',
+        course_number: '251',
+        section: '001',
+        credit: '3',
+        grade: 'B+',
+        class_avg: 'B',
+        term: 'Winter',
+        year: '2024',
+        title: 'Algorithms and Data Structures'
+      },
+      {
+        completed: 'RW',
+        department: 'COMP',
+        course_number: '303',
+        section: '001',
+        credit: '3',
+        term: 'Fall',
+        year: '2024',
+        title: 'Software Design'
+      },
+      {
+        completed: 'RW',
+        department: 'COMP',
+        course_number: '310',
+        section: '001',
+        credit: '3',
+        term: 'Fall',
+        year: '2024',
+        title: 'Operating Systems'
+      }
+    ]
+  },
+  courses: {
+    'COMP': {
+      '202': [
+        {
+          crn: '1234',
+          department: 'COMP',
+          course_number: '202',
+          type: 'Lecture',
+          instructor: 'John Smith',
+          days: ['Monday', 'Wednesday', 'Friday'],
+          time: ['10:35-11:25', '10:35-11:25', '10:35-11:25'],
+          is_full: false,
+          section: '001',
+          title: 'Foundations of Programming'
+        },
+        {
+          crn: '1235',
+          department: 'COMP',
+          course_number: '202',
+          type: 'Tutorial',
+          instructor: 'TA One',
+          days: ['Tuesday'],
+          time: ['14:35-15:55'],
+          is_full: false,
+          section: 'T01'
+        },
+        {
+          crn: '1236',
+          department: 'COMP',
+          course_number: '202',
+          type: 'Tutorial',
+          instructor: 'TA Two',
+          days: ['Thursday'],
+          time: ['14:35-15:55'],
+          is_full: true,
+          section: 'T02'
+        }
+      ],
+      '303': [
+        {
+          crn: '3334',
+          department: 'COMP',
+          course_number: '303',
+          type: 'Lecture',
+          instructor: 'Jane Doe',
+          days: ['Tuesday', 'Thursday'],
+          time: ['13:05-14:25', '13:05-14:25'],
+          is_full: false,
+          section: '001',
+          title: 'Software Design'
+        }
+      ],
+      '307': [
+        {
+          crn: '3534',
+          department: 'COMP',
+          course_number: '307',
+          type: 'Lecture',
+          instructor: 'Bob Johnson',
+          days: ['Monday', 'Wednesday', 'Friday'],
+          time: ['12:35-13:25', '12:35-13:25', '12:35-13:25'],
+          is_full: true,
+          section: '001',
+          title: 'Software Engineering'
+        }
+      ],
+      '421': [
+        {
+          crn: '4534',
+          department: 'COMP',
+          course_number: '421',
+          type: 'Lecture',
+          instructor: 'Alice Green',
+          days: ['Tuesday', 'Thursday'],
+          time: ['10:05-11:25', '10:05-11:25'],
+          is_full: false,
+          section: '001',
+          title: 'Database Systems'
+        }
+      ]
+    },
+    'MATH': {
+      '240': [
+        {
+          crn: '2341',
+          department: 'MATH',
+          course_number: '240',
+          type: 'Lecture',
+          instructor: 'Sarah White',
+          days: ['Monday', 'Wednesday', 'Friday'],
+          time: ['8:35-9:25', '8:35-9:25', '8:35-9:25'],
+          is_full: false,
+          section: '001',
+          title: 'Discrete Structures'
+        }
+      ],
+      '323': [
+        {
+          crn: '2451',
+          department: 'MATH',
+          course_number: '323',
+          type: 'Lecture',
+          instructor: 'Michael Gray',
+          days: ['Monday', 'Wednesday', 'Friday'],
+          time: ['9:35-10:25', '9:35-10:25', '9:35-10:25'],
+          is_full: false,
+          section: '001',
+          title: 'Probability Theory'
+        }
+      ]
+    }
+  },
+  registeredCourses: [
+    {
+      crn: '3334',
+      department: 'COMP',
+      course_number: '303',
+      section: '001',
+      title: 'Software Design',
+      instructor: 'Jane Doe',
+      days: ['Tuesday', 'Thursday'],
+      time: ['13:05-14:25', '13:05-14:25'],
+      location: 'Trottier 1080',
+      credits: '3',
+      status: 'Registered'
+    },
+    {
+      crn: '4998',
+      department: 'COMP',
+      course_number: '310',
+      section: '001',
+      title: 'Operating Systems',
+      instructor: 'Carlos Rodriguez',
+      days: ['Monday', 'Wednesday', 'Friday'],
+      time: ['14:35-15:25', '14:35-15:25', '14:35-15:25'],
+      location: 'Leacock 132',
+      credits: '3',
+      status: 'Registered'
+    }
+  ]
+};
+
+// Check if credentials are demo account
+const isDemoAccount = (username, password) => {
+  return username === 'demo' && password === 'demo';
+};
+
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
   // Get authorization header from the request
@@ -72,14 +306,26 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
     
+    // Check if using demo account
+    if (isDemoAccount(username, password)) {
+      // Create a JWT token with username and password
+      const token = jwt.sign({ username, password, isDemo: true }, JWT_SECRET, { expiresIn: '7d' });
+      
+      // Return the token to the client
+      return res.json({ 
+        message: 'Demo authentication successful',
+        token,
+        user: { username: 'demo', isDemo: true }
+      });
+    }
+    
+    // Regular authentication logic for non-demo accounts
     // Attempt to create a new Minerva instance with the provided credentials
-    // If this succeeds, the credentials are valid
     let userMinerva;
     try {
       userMinerva = new Minerva(username, password);
       
       // Try a basic operation to verify the credentials fully
-      // This will throw an error if authentication fails
       await userMinerva.getTranscript();
     } catch (error) {
       console.error('Authentication failed:', error);
@@ -122,6 +368,16 @@ app.post('/api/transcript', authenticateToken, async (req, res) => {
     const username = req.body.username || req.user.username;
     const password = req.body.password || req.user.password;
     
+    // Check if using demo account
+    if (isDemoAccount(username, password) || req.user.isDemo) {
+      return res.json({
+        cumGPA: dummyData.transcript.cumGPA,
+        courses: dummyData.transcript.courses,
+        student: { id: '260123456' }
+      });
+    }
+    
+    // Regular logic for non-demo accounts
     // Create a new Minerva instance with the provided credentials
     const userMinerva = new Minerva(username, password);
     
@@ -217,7 +473,7 @@ app.get('/api/transcript', authenticateToken, async (req, res) => {
 // Search for courses
 app.get('/api/courses', authenticateToken, async (req, res) => {
   try {
-  const dep = req.query.dep;
+    const dep = req.query.dep;
     const number = req.query.number;
     const season = req.query.season;
     const year = req.query.year;
@@ -237,11 +493,30 @@ app.get('/api/courses', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Valid 4-digit year is required' });
     }
 
-    if (number && !/^\d{1,3}[A-Z]?\d?$/.test(number)) {
-      return res.status(400).json({ error: 'Course number format is invalid' });
+    // Check if using demo account
+    if (isDemoAccount(username, password) || req.user.isDemo) {
+      const department = dep.toUpperCase();
+      let results = [];
+      
+      if (dummyData.courses[department]) {
+        if (number) {
+          // Filter by course number if provided
+          if (dummyData.courses[department][number]) {
+            results = dummyData.courses[department][number];
+          }
+        } else {
+          // Return all courses in the department
+          Object.values(dummyData.courses[department]).forEach(courses => {
+            results = [...results, ...courses];
+          });
+        }
+      }
+      
+      return res.json(results);
     }
-    
-    // Create a new Minerva instance with the user's credentials
+
+    // Regular logic for non-demo accounts
+    // Create a new Minerva instance with the provided credentials
     const userMinerva = new Minerva(username, password);
     
     const options = {
@@ -255,8 +530,6 @@ app.get('/api/courses', authenticateToken, async (req, res) => {
     }
     
     const courses = await userMinerva.getCourses(options);
-    console.log('Courses:', courses);
-
     
     // Validate courses data
     if (!courses || !Array.isArray(courses)) {
@@ -277,7 +550,11 @@ app.get('/api/courses', authenticateToken, async (req, res) => {
 // Add courses
 app.post('/api/courses/add', authenticateToken, async (req, res) => {
   try {
-    const { season, year, crn } = req.body;
+    const { season, year, crn, username, password } = req.body;
+    const userCredentials = {
+      username: username || req.user.username,
+      password: password || req.user.password
+    };
     
     // Input validation
     if (!season || !['f', 'w', 's'].includes(season.toLowerCase())) {
@@ -292,14 +569,19 @@ app.post('/api/courses/add', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'CRN is required' });
     }
 
-    // Validate CRN format - can be a string or array of strings
-    let crnArray = Array.isArray(crn) ? crn : [crn];
-    for (const crnItem of crnArray) {
-      if (!/^\d+$/.test(crnItem)) {
-        return res.status(400).json({ error: `Invalid CRN format: ${crnItem}` });
-      }
+    // Check if using demo account
+    if (isDemoAccount(userCredentials.username, userCredentials.password) || req.user.isDemo) {
+      // Simulate successful course addition
+      return res.json({ 
+        success: true, 
+        result: { 
+          message: 'Course added successfully (Demo)',
+          crn: crn
+        }
+      });
     }
     
+    // Regular logic for non-demo accounts
     // Create a new Minerva instance with the user's credentials
     const userMinerva = new Minerva(req.user.username, req.user.password);
     
@@ -327,7 +609,11 @@ app.post('/api/courses/add', authenticateToken, async (req, res) => {
 // Drop courses
 app.post('/api/courses/drop', authenticateToken, async (req, res) => {
   try {
-    const { season, year, crn } = req.body;
+    const { season, year, crn, username, password } = req.body;
+    const userCredentials = {
+      username: username || req.user.username,
+      password: password || req.user.password
+    };
     
     // Input validation
     if (!season || !['f', 'w', 's'].includes(season.toLowerCase())) {
@@ -342,14 +628,19 @@ app.post('/api/courses/drop', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'CRN is required' });
     }
 
-    // Validate CRN format - can be a string or array of strings
-    let crnArray = Array.isArray(crn) ? crn : [crn];
-    for (const crnItem of crnArray) {
-      if (!/^\d+$/.test(crnItem)) {
-        return res.status(400).json({ error: `Invalid CRN format: ${crnItem}` });
-      }
+    // Check if using demo account
+    if (isDemoAccount(userCredentials.username, userCredentials.password) || req.user.isDemo) {
+      // Simulate successful course drop
+      return res.json({ 
+        success: true, 
+        result: { 
+          message: 'Course dropped successfully (Demo)',
+          crn: crn
+        }
+      });
     }
     
+    // Regular logic for non-demo accounts
     // Create a new Minerva instance with the user's credentials
     const userMinerva = new Minerva(req.user.username, req.user.password);
     
@@ -395,8 +686,12 @@ app.post('/api/courses/registered', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Valid 4-digit year is required' });
     }
     
-    console.log(`Fetching registered courses for ${season} ${year}`);
+    // Check if using demo account
+    if (isDemoAccount(userCredentials.username, userCredentials.password) || req.user.isDemo) {
+      return res.json(dummyData.registeredCourses);
+    }
     
+    // Regular logic for non-demo accounts
     // Create a new Minerva instance with the user's credentials
     const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
     
@@ -411,8 +706,6 @@ app.post('/api/courses/registered', authenticateToken, async (req, res) => {
       console.error('Invalid registered courses data received:', registeredCourses);
       return res.status(500).json({ error: 'Invalid registered courses data received' });
     }
-    
-    console.log(`Found ${registeredCourses.length} registered courses`);
     
     // Return the registered courses to the client
     res.json(registeredCourses);
