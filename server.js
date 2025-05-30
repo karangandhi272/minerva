@@ -700,7 +700,7 @@ app.post('/api/courses/drop', authenticateToken, async (req, res) => {
   }
 });
 
-// Get registered courses
+// Get registered courses - now using getWeeklySchedule function
 app.post('/api/courses/registered', authenticateToken, async (req, res) => {
   try {
     // Get parameters from request body
@@ -726,28 +726,28 @@ app.post('/api/courses/registered', authenticateToken, async (req, res) => {
       return res.json(dummyData.registeredCourses);
     }
     
-    // Regular logic for non-demo accounts
+    // Regular logic for non-demo accounts - now using getWeeklySchedule
     // Create a new Minerva instance with the user's credentials
     const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
     
-    // Call the getRegisteredCourses method from minerva.js
-    const registeredCourses = await userMinerva.getRegisteredCourses({
+    // Call the getWeeklySchedule method from minerva.js instead of getRegisteredCourses
+    const weeklySchedule = await userMinerva.getWeeklySchedule({
       season: season.toLowerCase(),
       year
     });
     
     // Validate the response
-    if (!registeredCourses || !Array.isArray(registeredCourses)) {
-      console.error('Invalid registered courses data received:', registeredCourses);
-      return res.status(500).json({ error: 'Invalid registered courses data received' });
+    if (!weeklySchedule || !Array.isArray(weeklySchedule)) {
+      console.error('Invalid weekly schedule data received:', weeklySchedule);
+      return res.status(500).json({ error: 'Invalid weekly schedule data received' });
     }
     
-    // Return the registered courses to the client
-    res.json(registeredCourses);
+    // Return the weekly schedule to the client
+    res.json(weeklySchedule);
   } catch (error) {
-    console.error('Error fetching registered courses:', error);
+    console.error('Error fetching weekly schedule:', error);
     res.status(500).json({ 
-      error: 'Failed to fetch registered courses', 
+      error: 'Failed to fetch weekly schedule', 
       message: error.message || 'Unknown error',
       code: error.code || 'UNKNOWN_ERROR'
     });
