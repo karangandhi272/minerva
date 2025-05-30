@@ -823,6 +823,136 @@ app.post('/api/courses/view', authenticateToken, async (req, res) => {
   }
 });
 
+// Helper function to convert letter grades to grade points
+function convertGradeToPoints(grade) {
+  if (!grade || typeof grade !== 'string') {
+    return null;
+  }
+  
+  const gradeMap = {
+    'A': 4.0,
+    'A-': 3.7,
+    'B+': 3.3,
+    'B': 3.0,
+    'B-': 2.7,
+    'C+': 2.3,
+    'C': 2.0,
+    'D': 1.0,
+    'F': 0.0
+  };
+  
+  return gradeMap[grade.trim()] || null;
+}
+
+// Start the server with error handling
+const server = app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+}).on('error', (error) => {
+  console.error(`Failed to start server on port ${port}:`, error);
+  process.exit(1);
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed.');
+    process.exit(0);
+  });
+});
+
+// Helper function to parse weekly schedule HTML
+function parseWeeklySchedule(html) {
+  const cheerio = require('cheerio');
+  const $ = cheerio.load(html);
+  const courses = [];
+  
+  console.log('Parsing weekly schedule HTML');
+  
+  // Find all course links in the schedule table
+  $('a[href*="P_CrseSchdDetl"]').each(function() {
+    const link = $(this);
+    const href = link.attr('href');
+    const courseText = link.text().trim();
+    
+    console.log('Found course link:', courseText);
+    
+    // Extract CRN from the href URL
+    const crnMatch = href.match(/crn=(\d+)/);
+    const crn = crnMatch ? crnMatch[1] : '';
+    
+    // Parse the course text which looks like:
+    // "COMP 302-001\n2425 2 times 1.5 hrs/wk\n8:35 am-9:55 am\nStewart Biology Building S1/4"
+    const lines = courseText.split('\n').map(line => line.trim()).filter(line => line);
+    
+    if (lines.length >= 3) {
+      const courseCode = lines[0]; // e.g., "COMP 302-001"
+      const timeInfo = lines[2]; // e.g., "8:35 am-9:55 am"
+      const location = lines[3] || ''; // e.g., "Stewart Biology Building S1/4"
+      
+      // Parse course code
+      const codeMatch = courseCode.match(/([A-Z]+)\s+(\d+)-(\w+)/);
+      if (codeMatch) {
+        const department = codeMatch[1];
+        const course_number = codeMatch[2];
+        const section = codeMatch[3];
+        
+        // Convert time format from "8:35 am-9:55 am" to "08:35-09:55"
+        const convertTime = (timeStr) => {
+          return timeStr.replace(/(\d+):(\d+)\s*(am|pm)/gi, (match, hour, min, ampm) => {
+            let h = parseInt(hour);
+            if (ampm.toLowerCase() === 'pm' && h !== 12) h += 12;
+            if (ampm.toLowerCase() === 'am' && h === 12) h = 0;
+            return h.toString().padStart(2, '0') + ':' + min;
+          });
+        };
+        
+        const time24 = convertTime(timeInfo);
+        
+        // Determine days based on the cell position in the table
+        const cell = link.closest('td');
+        const row = cell.closest('tr');
+        const cellIndex = cell.index();
+        
+        // Map cell index to days (0=empty, 1=Monday, 2=Tuesday, etc.)
+        const dayMap = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const day = dayMap[cellIndex] || '';
+        
+        // Check if we already have this course
+        let existingCourse = courses.find(c => c.crn === crn);
+        
+        if (existingCourse) {
+          // Add this day and time to existing course
+          if (day && !existingCourse.days.includes(day)) {
+            existingCourse.days.push(day);
+            existingCourse.time.push(time24);
+          }
+        } else {
+          // Create new course entry
+          const course = {
+            crn: crn,
+            department: department,
+            course_number: course_number,
+            section: section,
+            title: '', // Not available in weekly schedule
+            instructor: '', // Not available in weekly schedule
+            days: day ? [day] : [],
+            time: time24 ? [time24] : [],
+            location: location,
+            credits: '', // Not available in weekly schedule
+            type: 'Lecture' // Default type
+          };
+          
+          courses.push(course);
+        }
+      }
+    }
+  });
+  
+  console.log('Parsed courses from weekly schedule:', courses);
+  return courses;
+}
+
 // Get schedule data
 app.post('/api/schedule', authenticateToken, async (req, res) => {
   try {
@@ -904,107 +1034,133 @@ app.post('/api/schedule', authenticateToken, async (req, res) => {
     try {
       const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
       
-      const registeredCourses = await userMinerva.getRegisteredCourses({
-        season: season.toLowerCase(),
-        year
-      });
-      
-      console.log('Raw registered courses from API:', JSON.stringify(registeredCourses, null, 2));
-      
-      // Transform the data to include schedule information with proper structure
-      const scheduleData = registeredCourses.map(course => {
-        console.log('Processing course:', course);
+      // First try to get registered courses
+      let scheduleData = [];
+      try {
+        const registeredCourses = await userMinerva.getRegisteredCourses({
+          season: season.toLowerCase(),
+          year
+        });
         
-        // Check multiple possible property names for days and time
-        let days = course.days || course.day || course.meeting_days || course.Days || course.Day;
-        let time = course.time || course.times || course.meeting_time || course.Time || course.Times;
+        console.log('Raw registered courses from API:', JSON.stringify(registeredCourses, null, 2));
         
-        console.log('Raw days value:', days, 'Type:', typeof days);
-        console.log('Raw time value:', time, 'Type:', typeof time);
-        
-        // Handle days parsing
-        if (days) {
-          if (typeof days === 'string') {
-            console.log('Converting days string to array:', days);
+        // If registered courses returns data, parse it normally
+        if (registeredCourses && registeredCourses.length > 0) {
+          scheduleData = registeredCourses.map(course => {
+            console.log('Processing course from registered courses:', course);
             
-            // Handle different day formats
-            if (days.includes(',')) {
-              // If comma-separated like "Monday, Wednesday, Friday"
-              days = days.split(',').map(d => d.trim());
-            } else if (days.length <= 5 && /^[MTWRF]+$/.test(days)) {
-              // If abbreviated like "MWF" or "TR"
-              const dayMap = { 'M': 'Monday', 'T': 'Tuesday', 'W': 'Wednesday', 'R': 'Thursday', 'F': 'Friday' };
-              days = days.split('').map(d => dayMap[d]).filter(Boolean);
-            } else {
-              // Single day or full name
-              days = [days];
-            }
-            console.log('Converted days:', days);
-          } else if (!Array.isArray(days)) {
-            console.log('Days not string or array, converting:', days);
-            days = [String(days)];
-          }
-        } else {
-          console.log('Days is undefined/null, setting to empty array');
-          days = [];
-        }
-        
-        // Handle time parsing
-        if (time) {
-          if (typeof time === 'string') {
-            console.log('Converting time string to array:', time);
+            // Check multiple possible property names for days and time
+            let days = course.days || course.day || course.meeting_days || course.Days || course.Day;
+            let time = course.time || course.times || course.meeting_time || course.Time || course.Times;
             
-            // Handle different time formats
-            if (time.includes(',')) {
-              // If comma-separated like "13:05-14:25, 13:05-14:25"
-              time = time.split(',').map(t => t.trim());
+            console.log('Raw days value:', days, 'Type:', typeof days);
+            console.log('Raw time value:', time, 'Type:', typeof time);
+            
+            // Handle days parsing
+            if (days) {
+              if (typeof days === 'string') {
+                console.log('Converting days string to array:', days);
+                
+                // Handle different day formats
+                if (days.includes(',')) {
+                  // If comma-separated like "Monday, Wednesday, Friday"
+                  days = days.split(',').map(d => d.trim());
+                } else if (days.length <= 5 && /^[MTWRF]+$/.test(days)) {
+                  // If abbreviated like "MWF" or "TR"
+                  const dayMap = { 'M': 'Monday', 'T': 'Tuesday', 'W': 'Wednesday', 'R': 'Thursday', 'F': 'Friday' };
+                  days = days.split('').map(d => dayMap[d]).filter(Boolean);
+                } else {
+                  // Single day or full name
+                  days = [days];
+                }
+                console.log('Converted days:', days);
+              } else if (!Array.isArray(days)) {
+                console.log('Days not string or array, converting:', days);
+                days = [String(days)];
+              }
             } else {
-              // Single time slot
-              time = [time];
+              console.log('Days is undefined/null, setting to empty array');
+              days = [];
             }
-            console.log('Converted time:', time);
-          } else if (!Array.isArray(time)) {
-            console.log('Time not string or array, converting:', time);
-            time = [String(time)];
-          }
-        } else {
-          console.log('Time is undefined/null, setting to empty array');
-          time = [];
+            
+            // Handle time parsing
+            if (time) {
+              if (typeof time === 'string') {
+                console.log('Converting time string to array:', time);
+                
+                // Handle different time formats
+                if (time.includes(',')) {
+                  // If comma-separated like "13:05-14:25, 13:05-14:25"
+                  time = time.split(',').map(t => t.trim());
+                } else {
+                  // Single time slot
+                  time = [time];
+                }
+                console.log('Converted time:', time);
+              } else if (!Array.isArray(time)) {
+                console.log('Time not string or array, converting:', time);
+                time = [String(time)];
+              }
+            } else {
+              console.log('Time is undefined/null, setting to empty array');
+              time = [];
+            }
+            
+            // Ensure arrays are properly formatted
+            if (!Array.isArray(days)) {
+              console.log('Final days check - not an array, setting to empty:', days);
+              days = [];
+            }
+            if (!Array.isArray(time)) {
+              console.log('Final time check - not an array, setting to empty:', time);
+              time = [];
+            }
+            
+            // If we have days but no corresponding times, duplicate the first time
+            if (days.length > 0 && time.length === 1 && days.length > 1) {
+              console.log('Duplicating single time for multiple days');
+              time = new Array(days.length).fill(time[0]);
+            }
+            
+            const transformedCourse = {
+              crn: course.crn || course.CRN,
+              department: course.department || course.subject || course.SUBJ,
+              course_number: course.course_number || course.course || course.CRSE,
+              section: course.section || course.SEC,
+              title: course.title || course.course_title || course.TITLE,
+              instructor: course.instructor || course.instructors || course.INSTR,
+              days: days,
+              time: time,
+              location: course.location || course.room || course.building || course.LOCATION,
+              credits: course.credits || course.credit || course.CRED || course.credit_hours,
+              type: course.type || course.schedule_type || 'Lecture'
+            };
+            
+            console.log('Transformed course:', transformedCourse);
+            return transformedCourse;
+          });
         }
+      } catch (registeredCoursesError) {
+        console.log('Registered courses failed, will try weekly schedule HTML parsing');
+      }
+      
+      // If registered courses didn't work or returned empty, try to parse the weekly schedule HTML
+      if (scheduleData.length === 0) {
+        console.log('Attempting to parse weekly schedule HTML...');
         
-        // Ensure arrays are properly formatted
-        if (!Array.isArray(days)) {
-          console.log('Final days check - not an array, setting to empty:', days);
-          days = [];
+        // Make a direct request to get the weekly schedule HTML
+        const axios = require('axios');
+        const sn = season.toLowerCase() === 'f' ? '09' : season.toLowerCase() === 'w' ? '01' : '05';
+        const termCode = year + sn;
+        
+        try {
+          // This would require implementing the weekly schedule request
+          // For now, let's try to get the HTML from the existing API response
+          console.log('Weekly schedule HTML parsing not yet implemented');
+        } catch (htmlError) {
+          console.log('Weekly schedule HTML parsing failed:', htmlError);
         }
-        if (!Array.isArray(time)) {
-          console.log('Final time check - not an array, setting to empty:', time);
-          time = [];
-        }
-        
-        // If we have days but no corresponding times, duplicate the first time
-        if (days.length > 0 && time.length === 1 && days.length > 1) {
-          console.log('Duplicating single time for multiple days');
-          time = new Array(days.length).fill(time[0]);
-        }
-        
-        const transformedCourse = {
-          crn: course.crn || course.CRN,
-          department: course.department || course.subject || course.SUBJ,
-          course_number: course.course_number || course.course || course.CRSE,
-          section: course.section || course.SEC,
-          title: course.title || course.course_title || course.TITLE,
-          instructor: course.instructor || course.instructors || course.INSTR,
-          days: days,
-          time: time,
-          location: course.location || course.room || course.building || course.LOCATION,
-          credits: course.credits || course.credit || course.CRED || course.credit_hours,
-          type: course.type || course.schedule_type || 'Lecture'
-        };
-        
-        console.log('Transformed course:', transformedCourse);
-        return transformedCourse;
-      });
+      }
       
       console.log('Final schedule data response:', JSON.stringify(scheduleData, null, 2));
       res.json(scheduleData);
@@ -1022,42 +1178,4 @@ app.post('/api/schedule', authenticateToken, async (req, res) => {
       code: error.code || 'UNKNOWN_ERROR'
     });
   }
-});
-
-// Helper function to convert letter grades to grade points
-function convertGradeToPoints(grade) {
-  if (!grade || typeof grade !== 'string') {
-    return null;
-  }
-  
-  const gradeMap = {
-    'A': 4.0,
-    'A-': 3.7,
-    'B+': 3.3,
-    'B': 3.0,
-    'B-': 2.7,
-    'C+': 2.3,
-    'C': 2.0,
-    'D': 1.0,
-    'F': 0.0
-  };
-  
-  return gradeMap[grade.trim()] || null;
-}
-
-// Start the server with error handling
-const server = app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-}).on('error', (error) => {
-  console.error(`Failed to start server on port ${port}:`, error);
-  process.exit(1);
-});
-
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('Server closed.');
-    process.exit(0);
-  });
 });
