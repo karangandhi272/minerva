@@ -669,6 +669,8 @@ app.post('/api/courses/drop', authenticateToken, async (req, res) => {
       year,
       crn
     });
+
+    console.log('Drop result:', result);
     
     if (!result) {
       return res.status(500).json({ error: 'Failed to drop course - no result returned' });
