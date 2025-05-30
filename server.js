@@ -602,8 +602,8 @@ app.post('/api/courses/add', authenticateToken, async (req, res) => {
     }
     
     // Regular logic for non-demo accounts
-    // Create a new Minerva instance with the user's credentials
-    const userMinerva = new Minerva(req.user.username, req.user.password);
+    // Use the credentials from the request body or token
+    const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
     
     const result = await userMinerva.addCourses({
       season: season.toLowerCase(),
@@ -661,8 +661,8 @@ app.post('/api/courses/drop', authenticateToken, async (req, res) => {
     }
     
     // Regular logic for non-demo accounts
-    // Create a new Minerva instance with the user's credentials
-    const userMinerva = new Minerva(req.user.username, req.user.password);
+    // Use the credentials from the request body or token
+    const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
     
     const result = await userMinerva.dropCourses({
       season: season.toLowerCase(),
@@ -832,8 +832,8 @@ app.post('/api/schedule', authenticateToken, async (req, res) => {
     
     // Check if using demo account
     if (isDemoAccount(userCredentials.username, userCredentials.password) || req.user.isDemo) {
-      // Return demo schedule data
-      return res.json([
+      // Return demo schedule data with correct format
+      const demoSchedule = [
         {
           crn: '3334',
           department: 'COMP',
@@ -873,24 +873,67 @@ app.post('/api/schedule', authenticateToken, async (req, res) => {
           credits: '0',
           type: 'Tutorial'
         }
-      ]);
+      ];
+
+      console.log('Returning demo schedule:', demoSchedule);
+      return res.json(demoSchedule);
     }
     
     // Regular logic for non-demo accounts
     const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
     
-    const registeredCourses = await userMinerva.getRegisteredCourses({
-      season: season.toLowerCase(),
-      year
-    });
-    
-    // Transform the data to include schedule information
-    const scheduleData = registeredCourses.map(course => ({
-      ...course,
-      type: course.type || 'Lecture' // Default to Lecture if type not specified
-    }));
-    
-    res.json(scheduleData);
+    try {
+      const registeredCourses = await userMinerva.getRegisteredCourses({
+        season: season.toLowerCase(),
+        year
+      });
+      
+      console.log('Raw registered courses:', registeredCourses);
+      
+      // Transform the data to include schedule information with proper structure
+      const scheduleData = registeredCourses.map(course => {
+        // Ensure days and time are arrays
+        let days = course.days;
+        let time = course.time;
+        
+        // If days is a string, try to parse it
+        if (typeof days === 'string') {
+          // Common day abbreviations
+          const dayMap = { 'M': 'Monday', 'T': 'Tuesday', 'W': 'Wednesday', 'R': 'Thursday', 'F': 'Friday' };
+          days = days.split('').map(d => dayMap[d] || d).filter(Boolean);
+        }
+        
+        // If time is a string, convert to array
+        if (typeof time === 'string') {
+          time = [time];
+        }
+        
+        // Ensure days and time are arrays
+        if (!Array.isArray(days)) days = [];
+        if (!Array.isArray(time)) time = [];
+        
+        return {
+          crn: course.crn,
+          department: course.department,
+          course_number: course.course_number,
+          section: course.section,
+          title: course.title,
+          instructor: course.instructor,
+          days: days,
+          time: time,
+          location: course.location,
+          credits: course.credits,
+          type: course.type || 'Lecture'
+        };
+      });
+      
+      console.log('Transformed schedule data:', scheduleData);
+      res.json(scheduleData);
+    } catch (registeredCoursesError) {
+      console.error('Error getting registered courses:', registeredCoursesError);
+      // If registered courses fails, return empty array
+      res.json([]);
+    }
   } catch (error) {
     console.error('Error fetching schedule:', error);
     res.status(500).json({ 
