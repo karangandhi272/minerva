@@ -370,15 +370,33 @@ app.post('/api/transcript', authenticateToken, async (req, res) => {
     
     // Check if using demo account
     if (isDemoAccount(username, password) || req.user.isDemo) {
+      // Calculate GPA for demo data - only for courses with final grades
+      let totalGradePoints = 0;
+      let totalCredits = 0;
+      
+      dummyData.transcript.courses.forEach(course => {
+        // Only include courses that have a final grade (not registered courses)
+        if (course.grade && course.completed !== "RW") {
+          const gradePoint = convertGradeToPoints(course.grade);
+          const credits = parseFloat(course.credit);
+          
+          if (!isNaN(gradePoint) && !isNaN(credits) && gradePoint !== null) {
+            totalGradePoints += gradePoint * credits;
+            totalCredits += credits;
+          }
+        }
+      });
+      
+      const cumGPA = totalCredits > 0 ? (totalGradePoints / totalCredits).toFixed(2) : 'N/A';
+      
       return res.json({
-        cumGPA: dummyData.transcript.cumGPA,
+        cumGPA: cumGPA,
         courses: dummyData.transcript.courses,
         student: { id: '260123456' }
       });
     }
     
     // Regular logic for non-demo accounts
-    // Create a new Minerva instance with the provided credentials
     const userMinerva = new Minerva(username, password);
     
     const transcript = await userMinerva.getTranscript();
@@ -388,16 +406,17 @@ app.post('/api/transcript', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: 'Invalid transcript data received' });
     }
     
-    // Calculate CUM GPA
+    // Calculate CUM GPA - only for courses with final grades
     let totalGradePoints = 0;
     let totalCredits = 0;
     
     transcript.forEach(course => {
-      if (course.grade && course.credit) {
+      // Only include courses that have a final grade (not registered courses)
+      if (course.grade && course.completed !== "RW") {
         const gradePoint = convertGradeToPoints(course.grade);
         const credits = parseFloat(course.credit);
         
-        if (!isNaN(gradePoint) && !isNaN(credits)) {
+        if (!isNaN(gradePoint) && !isNaN(credits) && gradePoint !== null) {
           totalGradePoints += gradePoint * credits;
           totalCredits += credits;
         }
@@ -420,7 +439,7 @@ app.post('/api/transcript', authenticateToken, async (req, res) => {
   }
 });
 
-// Keep the original GET endpoint for backward compatibility
+// Keep the original GET endpoint for backward compatibility - also updated
 app.get('/api/transcript', authenticateToken, async (req, res) => {
   try {
     // Get credentials from query params or token
@@ -437,16 +456,17 @@ app.get('/api/transcript', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: 'Invalid transcript data received' });
     }
     
-    // Calculate CUM GPA
+    // Calculate CUM GPA - only for courses with final grades
     let totalGradePoints = 0;
     let totalCredits = 0;
     
     transcript.forEach(course => {
-      if (course.grade && course.credit) {
+      // Only include courses that have a final grade (not registered courses)
+      if (course.grade && course.completed !== "RW") {
         const gradePoint = convertGradeToPoints(course.grade);
         const credits = parseFloat(course.credit);
         
-        if (!isNaN(gradePoint) && !isNaN(credits)) {
+        if (!isNaN(gradePoint) && !isNaN(credits) && gradePoint !== null) {
           totalGradePoints += gradePoint * credits;
           totalCredits += credits;
         }
