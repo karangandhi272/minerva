@@ -741,6 +741,166 @@ app.post('/api/courses/registered', authenticateToken, async (req, res) => {
   }
 });
 
+// View course details
+app.post('/api/courses/view', authenticateToken, async (req, res) => {
+  try {
+    const { season, year, crn, username, password } = req.body;
+    
+    // Use credentials from request body or fallback to token
+    const userCredentials = {
+      username: username || req.user.username,
+      password: password || req.user.password
+    };
+    
+    // Input validation
+    if (!season || !['f', 'w', 's'].includes(season.toLowerCase())) {
+      return res.status(400).json({ error: 'Valid season is required (f, w, s)' });
+    }
+
+    if (!year || !/^\d{4}$/.test(year)) {
+      return res.status(400).json({ error: 'Valid 4-digit year is required' });
+    }
+
+    if (!crn) {
+      return res.status(400).json({ error: 'CRN is required' });
+    }
+    
+    // Check if using demo account
+    if (isDemoAccount(userCredentials.username, userCredentials.password) || req.user.isDemo) {
+      // Return demo course detail
+      return res.json({
+        title: 'Software Design',
+        crn: crn,
+        course_code: 'COMP 303',
+        section: '001',
+        term: 'Fall 2024',
+        credits: '3.000',
+        meeting_times: [
+          {
+            type: 'Lecture',
+            time: '13:05-14:25',
+            days: 'TR',
+            location: 'Trottier 1080',
+            date_range: '08/27/2024-12/03/2024',
+            schedule_type: 'Lecture',
+            instructors: 'Jane Doe'
+          }
+        ],
+        description: 'Introduction to software design principles and patterns.'
+      });
+    }
+    
+    // Regular logic for non-demo accounts
+    const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
+    
+    const courseDetail = await userMinerva.viewCourse({
+      season: season.toLowerCase(),
+      year,
+      crn
+    });
+    
+    res.json(courseDetail);
+  } catch (error) {
+    console.error('Error viewing course:', error);
+    res.status(500).json({ 
+      error: 'Failed to view course', 
+      message: error.message || 'Unknown error',
+      code: error.code || 'UNKNOWN_ERROR'
+    });
+  }
+});
+
+// Get schedule data
+app.post('/api/schedule', authenticateToken, async (req, res) => {
+  try {
+    const { season, year, username, password } = req.body;
+    
+    // Use credentials from request body or fallback to token
+    const userCredentials = {
+      username: username || req.user.username,
+      password: password || req.user.password
+    };
+    
+    // Input validation
+    if (!season || !['f', 'w', 's'].includes(season.toLowerCase())) {
+      return res.status(400).json({ error: 'Valid season is required (f, w, s)' });
+    }
+
+    if (!year || !/^\d{4}$/.test(year)) {
+      return res.status(400).json({ error: 'Valid 4-digit year is required' });
+    }
+    
+    // Check if using demo account
+    if (isDemoAccount(userCredentials.username, userCredentials.password) || req.user.isDemo) {
+      // Return demo schedule data
+      return res.json([
+        {
+          crn: '3334',
+          department: 'COMP',
+          course_number: '303',
+          section: '001',
+          title: 'Software Design',
+          instructor: 'Jane Doe',
+          days: ['Tuesday', 'Thursday'],
+          time: ['13:05-14:25', '13:05-14:25'],
+          location: 'Trottier 1080',
+          credits: '3',
+          type: 'Lecture'
+        },
+        {
+          crn: '4998',
+          department: 'COMP',
+          course_number: '310',
+          section: '001',
+          title: 'Operating Systems',
+          instructor: 'Carlos Rodriguez',
+          days: ['Monday', 'Wednesday', 'Friday'],
+          time: ['14:35-15:25', '14:35-15:25', '14:35-15:25'],
+          location: 'Leacock 132',
+          credits: '3',
+          type: 'Lecture'
+        },
+        {
+          crn: '5001',
+          department: 'MATH',
+          course_number: '324',
+          section: 'T01',
+          title: 'Statistics Tutorial',
+          instructor: 'TA Smith',
+          days: ['Friday'],
+          time: ['10:35-11:25'],
+          location: 'Burnside 1205',
+          credits: '0',
+          type: 'Tutorial'
+        }
+      ]);
+    }
+    
+    // Regular logic for non-demo accounts
+    const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
+    
+    const registeredCourses = await userMinerva.getRegisteredCourses({
+      season: season.toLowerCase(),
+      year
+    });
+    
+    // Transform the data to include schedule information
+    const scheduleData = registeredCourses.map(course => ({
+      ...course,
+      type: course.type || 'Lecture' // Default to Lecture if type not specified
+    }));
+    
+    res.json(scheduleData);
+  } catch (error) {
+    console.error('Error fetching schedule:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch schedule', 
+      message: error.message || 'Unknown error',
+      code: error.code || 'UNKNOWN_ERROR'
+    });
+  }
+});
+
 // Helper function to convert letter grades to grade points
 function convertGradeToPoints(grade) {
   if (!grade || typeof grade !== 'string') {
