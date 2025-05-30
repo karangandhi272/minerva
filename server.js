@@ -915,48 +915,91 @@ app.post('/api/schedule', authenticateToken, async (req, res) => {
       const scheduleData = registeredCourses.map(course => {
         console.log('Processing course:', course);
         
-        // Ensure days and time are arrays
-        let days = course.days;
-        let time = course.time;
+        // Check multiple possible property names for days and time
+        let days = course.days || course.day || course.meeting_days || course.Days || course.Day;
+        let time = course.time || course.times || course.meeting_time || course.Time || course.Times;
         
-        // If days is a string, try to parse it
-        if (typeof days === 'string') {
-          console.log('Converting days string to array:', days);
-          // Common day abbreviations
-          const dayMap = { 'M': 'Monday', 'T': 'Tuesday', 'W': 'Wednesday', 'R': 'Thursday', 'F': 'Friday' };
-          days = days.split('').map(d => dayMap[d] || d).filter(Boolean);
-          console.log('Converted days:', days);
-        }
+        console.log('Raw days value:', days, 'Type:', typeof days);
+        console.log('Raw time value:', time, 'Type:', typeof time);
         
-        // If time is a string, convert to array
-        if (typeof time === 'string') {
-          console.log('Converting time string to array:', time);
-          time = [time];
-          console.log('Converted time:', time);
-        }
-        
-        // Ensure days and time are arrays
-        if (!Array.isArray(days)) {
-          console.log('Days not an array, setting to empty:', days);
+        // Handle days parsing
+        if (days) {
+          if (typeof days === 'string') {
+            console.log('Converting days string to array:', days);
+            
+            // Handle different day formats
+            if (days.includes(',')) {
+              // If comma-separated like "Monday, Wednesday, Friday"
+              days = days.split(',').map(d => d.trim());
+            } else if (days.length <= 5 && /^[MTWRF]+$/.test(days)) {
+              // If abbreviated like "MWF" or "TR"
+              const dayMap = { 'M': 'Monday', 'T': 'Tuesday', 'W': 'Wednesday', 'R': 'Thursday', 'F': 'Friday' };
+              days = days.split('').map(d => dayMap[d]).filter(Boolean);
+            } else {
+              // Single day or full name
+              days = [days];
+            }
+            console.log('Converted days:', days);
+          } else if (!Array.isArray(days)) {
+            console.log('Days not string or array, converting:', days);
+            days = [String(days)];
+          }
+        } else {
+          console.log('Days is undefined/null, setting to empty array');
           days = [];
         }
-        if (!Array.isArray(time)) {
-          console.log('Time not an array, setting to empty:', time);
+        
+        // Handle time parsing
+        if (time) {
+          if (typeof time === 'string') {
+            console.log('Converting time string to array:', time);
+            
+            // Handle different time formats
+            if (time.includes(',')) {
+              // If comma-separated like "13:05-14:25, 13:05-14:25"
+              time = time.split(',').map(t => t.trim());
+            } else {
+              // Single time slot
+              time = [time];
+            }
+            console.log('Converted time:', time);
+          } else if (!Array.isArray(time)) {
+            console.log('Time not string or array, converting:', time);
+            time = [String(time)];
+          }
+        } else {
+          console.log('Time is undefined/null, setting to empty array');
           time = [];
         }
         
+        // Ensure arrays are properly formatted
+        if (!Array.isArray(days)) {
+          console.log('Final days check - not an array, setting to empty:', days);
+          days = [];
+        }
+        if (!Array.isArray(time)) {
+          console.log('Final time check - not an array, setting to empty:', time);
+          time = [];
+        }
+        
+        // If we have days but no corresponding times, duplicate the first time
+        if (days.length > 0 && time.length === 1 && days.length > 1) {
+          console.log('Duplicating single time for multiple days');
+          time = new Array(days.length).fill(time[0]);
+        }
+        
         const transformedCourse = {
-          crn: course.crn,
-          department: course.department,
-          course_number: course.course_number,
-          section: course.section,
-          title: course.title,
-          instructor: course.instructor,
+          crn: course.crn || course.CRN,
+          department: course.department || course.subject || course.SUBJ,
+          course_number: course.course_number || course.course || course.CRSE,
+          section: course.section || course.SEC,
+          title: course.title || course.course_title || course.TITLE,
+          instructor: course.instructor || course.instructors || course.INSTR,
           days: days,
           time: time,
-          location: course.location,
-          credits: course.credits,
-          type: course.type || 'Lecture'
+          location: course.location || course.room || course.building || course.LOCATION,
+          credits: course.credits || course.credit || course.CRED || course.credit_hours,
+          type: course.type || course.schedule_type || 'Lecture'
         };
         
         console.log('Transformed course:', transformedCourse);
