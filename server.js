@@ -630,6 +630,9 @@ app.post('/api/courses/add', authenticateToken, async (req, res) => {
 app.post('/api/courses/drop', authenticateToken, async (req, res) => {
   try {
     const { season, year, crn, username, password } = req.body;
+    
+    console.log('Drop course request received:', { season, year, crn, username: username || req.user.username });
+    
     const userCredentials = {
       username: username || req.user.username,
       password: password || req.user.password
@@ -637,19 +640,23 @@ app.post('/api/courses/drop', authenticateToken, async (req, res) => {
     
     // Input validation
     if (!season || !['f', 'w', 's'].includes(season.toLowerCase())) {
+      console.log('Invalid season:', season);
       return res.status(400).json({ error: 'Valid season is required (f, w, s)' });
     }
 
     if (!year || !/^\d{4}$/.test(year)) {
+      console.log('Invalid year:', year);
       return res.status(400).json({ error: 'Valid 4-digit year is required' });
     }
 
     if (!crn) {
+      console.log('Missing CRN');
       return res.status(400).json({ error: 'CRN is required' });
     }
 
     // Check if using demo account
     if (isDemoAccount(userCredentials.username, userCredentials.password) || req.user.isDemo) {
+      console.log('Demo account - simulating course drop for CRN:', crn);
       // Simulate successful course drop
       return res.json({ 
         success: true, 
@@ -660,25 +667,31 @@ app.post('/api/courses/drop', authenticateToken, async (req, res) => {
       });
     }
     
+    console.log('Real account - attempting to drop course with credentials:', userCredentials.username);
+    
     // Regular logic for non-demo accounts
-    // Use the credentials from the request body or token
-    const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
-    
-    const result = await userMinerva.dropCourses({
-      season: season.toLowerCase(),
-      year,
-      crn
-    });
+    try {
+      const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
+      
+      const result = await userMinerva.dropCourses({
+        season: season.toLowerCase(),
+        year,
+        crn
+      });
 
-    console.log('Drop result:', result);
-    
-    if (!result) {
-      return res.status(500).json({ error: 'Failed to drop course - no result returned' });
+      console.log('Drop result:', result);
+      
+      res.json({ success: true, result });
+    } catch (dropError) {
+      console.error('Error in dropCourses method:', dropError);
+      return res.status(500).json({ 
+        error: 'Failed to drop course', 
+        message: dropError.message || 'Unknown error in drop operation',
+        code: dropError.code || 'DROP_ERROR'
+      });
     }
-    
-    res.json({ success: true, result });
   } catch (error) {
-    console.error('Error dropping courses:', error);
+    console.error('Error dropping courses (outer catch):', error);
     res.status(500).json({ 
       error: 'Failed to drop courses', 
       message: error.message || 'Unknown error',
@@ -815,6 +828,8 @@ app.post('/api/schedule', authenticateToken, async (req, res) => {
   try {
     const { season, year, username, password } = req.body;
     
+    console.log('Schedule request received:', { season, year, username: username || req.user.username });
+    
     // Use credentials from request body or fallback to token
     const userCredentials = {
       username: username || req.user.username,
@@ -823,15 +838,19 @@ app.post('/api/schedule', authenticateToken, async (req, res) => {
     
     // Input validation
     if (!season || !['f', 'w', 's'].includes(season.toLowerCase())) {
+      console.log('Invalid season for schedule:', season);
       return res.status(400).json({ error: 'Valid season is required (f, w, s)' });
     }
 
     if (!year || !/^\d{4}$/.test(year)) {
+      console.log('Invalid year for schedule:', year);
       return res.status(400).json({ error: 'Valid 4-digit year is required' });
     }
     
     // Check if using demo account
     if (isDemoAccount(userCredentials.username, userCredentials.password) || req.user.isDemo) {
+      console.log('Demo account - returning demo schedule');
+      
       // Return demo schedule data with correct format
       const demoSchedule = [
         {
@@ -875,44 +894,58 @@ app.post('/api/schedule', authenticateToken, async (req, res) => {
         }
       ];
 
-      console.log('Returning demo schedule:', demoSchedule);
+      console.log('Demo schedule response:', JSON.stringify(demoSchedule, null, 2));
       return res.json(demoSchedule);
     }
     
-    // Regular logic for non-demo accounts
-    const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
+    console.log('Real account - fetching actual schedule');
     
+    // Regular logic for non-demo accounts
     try {
+      const userMinerva = new Minerva(userCredentials.username, userCredentials.password);
+      
       const registeredCourses = await userMinerva.getRegisteredCourses({
         season: season.toLowerCase(),
         year
       });
       
-      console.log('Raw registered courses:', registeredCourses);
+      console.log('Raw registered courses from API:', JSON.stringify(registeredCourses, null, 2));
       
       // Transform the data to include schedule information with proper structure
       const scheduleData = registeredCourses.map(course => {
+        console.log('Processing course:', course);
+        
         // Ensure days and time are arrays
         let days = course.days;
         let time = course.time;
         
         // If days is a string, try to parse it
         if (typeof days === 'string') {
+          console.log('Converting days string to array:', days);
           // Common day abbreviations
           const dayMap = { 'M': 'Monday', 'T': 'Tuesday', 'W': 'Wednesday', 'R': 'Thursday', 'F': 'Friday' };
           days = days.split('').map(d => dayMap[d] || d).filter(Boolean);
+          console.log('Converted days:', days);
         }
         
         // If time is a string, convert to array
         if (typeof time === 'string') {
+          console.log('Converting time string to array:', time);
           time = [time];
+          console.log('Converted time:', time);
         }
         
         // Ensure days and time are arrays
-        if (!Array.isArray(days)) days = [];
-        if (!Array.isArray(time)) time = [];
+        if (!Array.isArray(days)) {
+          console.log('Days not an array, setting to empty:', days);
+          days = [];
+        }
+        if (!Array.isArray(time)) {
+          console.log('Time not an array, setting to empty:', time);
+          time = [];
+        }
         
-        return {
+        const transformedCourse = {
           crn: course.crn,
           department: course.department,
           course_number: course.course_number,
@@ -925,17 +958,21 @@ app.post('/api/schedule', authenticateToken, async (req, res) => {
           credits: course.credits,
           type: course.type || 'Lecture'
         };
+        
+        console.log('Transformed course:', transformedCourse);
+        return transformedCourse;
       });
       
-      console.log('Transformed schedule data:', scheduleData);
+      console.log('Final schedule data response:', JSON.stringify(scheduleData, null, 2));
       res.json(scheduleData);
     } catch (registeredCoursesError) {
       console.error('Error getting registered courses:', registeredCoursesError);
+      console.log('Returning empty schedule due to error');
       // If registered courses fails, return empty array
       res.json([]);
     }
   } catch (error) {
-    console.error('Error fetching schedule:', error);
+    console.error('Error fetching schedule (outer catch):', error);
     res.status(500).json({ 
       error: 'Failed to fetch schedule', 
       message: error.message || 'Unknown error',
