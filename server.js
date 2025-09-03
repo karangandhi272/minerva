@@ -8,7 +8,7 @@ const jwt = require('jsonwebtoken');
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 80;
 const JWT_SECRET = process.env.JWT_SECRET || 'minerva-app-jwt-secret';
 
 // Middleware
